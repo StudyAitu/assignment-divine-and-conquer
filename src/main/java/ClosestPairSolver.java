@@ -1,6 +1,8 @@
-import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Comparator;
+import java.util.IdentityHashMap;
+import java.util.Set;
+import java.util.ArrayList;
 import java.util.List;
 
 public class ClosestPairSolver {
@@ -24,9 +26,10 @@ public class ClosestPairSolver {
             return Double.POSITIVE_INFINITY;
         }
         Point[] px = points.clone();
+        Point[] py = points.clone();
         Arrays.sort(px, Comparator.comparingDouble(p -> p.x));
-        Point[] py = px.clone();
         Arrays.sort(py, Comparator.comparingDouble(p -> p.y));
+        metrics.swapsOrAllocations += points.length * 2L;
 
         double result = solveRecursive(px, py, metrics);
         metrics.executionTimeNs = System.nanoTime() - startTime;
@@ -37,18 +40,22 @@ public class ClosestPairSolver {
         metrics.enterRecursion();
         int n = px.length;
         if (n <= 3) {
+            double result = bruteForce(px);
             metrics.exitRecursion();
-            return bruteForce(px);
+            return result;
         }
+
         int mid = n / 2;
         Point midPoint = px[mid];
         Point[] lx = Arrays.copyOfRange(px, 0, mid);
         Point[] rx = Arrays.copyOfRange(px, mid, n);
 
-        List<Point> lyList = new ArrayList<>();
-        List<Point> ryList = new ArrayList<>();
+        Set<Point> leftSet = java.util.Collections.newSetFromMap(new IdentityHashMap<>());
+        leftSet.addAll(Arrays.asList(lx));
+        List<Point> lyList = new ArrayList<>(mid);
+        List<Point> ryList = new ArrayList<>(n - mid);
         for (Point p : py) {
-            if (p.x <= midPoint.x) lyList.add(p);
+            if (leftSet.contains(p)) lyList.add(p);
             else ryList.add(p);
         }
 
@@ -62,9 +69,8 @@ public class ClosestPairSolver {
         }
 
         double stripMin = delta;
-        int stripSize = strip.size();
-        for (int i = 0; i < stripSize; i++) {
-            for (int j = i + 1; j < stripSize && (strip.get(j).y - strip.get(i).y) < stripMin; j++) {
+        for (int i = 0; i < strip.size(); i++) {
+            for (int j = i + 1; j < strip.size() && (strip.get(j).y - strip.get(i).y) < stripMin; j++) {
                 metrics.comparisons++;
                 double dist = strip.get(i).distanceTo(strip.get(j));
                 if (dist < stripMin) stripMin = dist;
